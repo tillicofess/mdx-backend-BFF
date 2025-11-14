@@ -1,0 +1,35 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "cross-env NODE_EXTRA_CA_CERTS=\"C:\\Users\\till\\AppData\\Local\\mkcert\\rootCA.pem\" node index.js"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "axios": "^1.11.0",
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "crypto": "^1.0.1",
+    "dotenv": "^17.2.2",
+    "express": "^5.1.0",
+    "express-session": "^1.18.2",
+    "fs-extra": "^11.3.2",
+    "jose": "^6.1.0",
+    "keycloak-connect": "26.1.1",
+    "multer": "^2.0.2",
+    "mysql2": "^3.14.4",
+    "openid-client": "^5.7.1",
+    "passport": "^0.7.0",
+    "path": "^0.12.7",
+    "qs": "^6.14.0",
+    "url": "^0.11.4"
+  },
+  "devDependencies": {
+    "cross-env": "^10.1.0"
+  }
+}
