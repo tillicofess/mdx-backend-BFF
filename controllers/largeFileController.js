@@ -1,6 +1,6 @@
 import path from 'path';
 import { fileURLToPath } from "url";
-import fse from 'fs-extra'; // 文件操作工具（比原生fs更易用）
+import fse from 'fs-extra';
 
 // ----------------------
 // 上传文件保存目录
