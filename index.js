@@ -84,6 +84,7 @@ app.get('/me', (req, res) => {
         authenticated: true,
         userInfo: {
             username: req.user.claims.preferred_username,
+            uuid: req.user.claims.sub,
             roles: roles
         }
     });

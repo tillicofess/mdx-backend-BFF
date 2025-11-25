@@ -9,5 +9,8 @@ router.post('/check', largeFileController.checkFile);
 router.post("/upload", requireScope('LargeFile Resource', 'upload'), uploadMiddleware, largeFileController.uploadChunk);
 router.post("/merge", largeFileController.mergeChunks);
 router.get("/list", largeFileController.getFileList);
+router.post("/createFolder", largeFileController.createFolder);
+router.delete("/delete/:id", largeFileController.deleteFileOrFolder);
+router.post("/rename", largeFileController.renameFolderOrFile);
 
 export default router;
