@@ -474,3 +474,80 @@ export const deleteFileOrFolder = async (req, res) => {
         if (connection) connection.release();
     }
 }
+
+
+// 假设你已经有：
+// const pool = require('./dbPool');
+// 并且 req.user.claims.sub 中包含当前用户 id
+export const moveFileOrFolder = async (req, res) => {
+    const userId = req.user.claims.sub;
+    const { draggedId, newParentId } = req.body;
+
+    if (!draggedId || !newParentId) {
+        return res.status(400).json({ code: 1, message: 'draggedId and newParentId are required.' });
+    }
+
+    let connection;
+    try {
+        connection = await pool.getConnection();
+        await connection.beginTransaction();
+
+        // 1) 检查被移动的条目是否存在且属于当前用户
+        const [draggedRows] = await connection.query(
+            `SELECT id, is_directory, parent_id FROM files_metadata WHERE id = ? AND user_id = ?`,
+            [draggedId, userId]
+        );
+        if (draggedRows.length === 0) {
+            await connection.rollback();
+            return res.status(404).json({ code: 1, message: 'Dragged item not found or not owned by user.' });
+        }
+        const draggedItem = draggedRows[0];
+
+        // 2) 如果 newParentId 不为空，检查目标目录是否存在且是目录，且属于当前用户
+        if (newParentId !== null && newParentId !== undefined) {
+            const [targetRows] = await connection.query(
+                `SELECT id, is_directory, parent_id, user_id FROM files_metadata WHERE id = ?`,
+                [newParentId]
+            );
+            if (targetRows.length === 0) {
+                await connection.rollback();
+                return res.status(400).json({ code: 1, message: 'Target folder not found.' });
+            }
+            const target = targetRows[0];
+
+            if (target.user_id !== userId) {
+                await connection.rollback();
+                return res.status(403).json({ code: 1, message: 'No permission on target folder.' });
+            }
+
+            if (!target.is_directory) {
+                await connection.rollback();
+                return res.status(400).json({ code: 1, message: 'Target is not a directory.' });
+            }
+
+            // 3) 不能把自己移动到自己（draggedId === newParentId）
+            if (String(draggedId) === String(newParentId)) {
+                await connection.rollback();
+                return res.status(400).json({ code: 1, message: 'Cannot move item into itself.' });
+            }
+        }
+
+        // 4) 最后执行更新 parent_id（支持将 parent_id 设为 null，即移动到根）
+        await connection.query(
+            `UPDATE files_metadata SET parent_id = ? WHERE id = ? AND user_id = ?`,
+            [newParentId || null, draggedId, userId]
+        );
+
+        await connection.commit();
+        return res.json({ code: 0, message: 'Move successful.' });
+
+    } catch (error) {
+        console.error('Error moving file/folder:', error);
+        if (connection) {
+            try { await connection.rollback(); } catch (e) { console.error('Rollback error', e); }
+        }
+        return res.status(500).json({ code: 1, message: 'Move failed due to server error.' });
+    } finally {
+        if (connection) connection.release();
+    }
+};

@@ -12,5 +12,7 @@ router.get("/list", largeFileController.getFileList);
 router.post("/createFolder", largeFileController.createFolder);
 router.delete("/delete/:id", largeFileController.deleteFileOrFolder);
 router.post("/rename", largeFileController.renameFolderOrFile);
+router.post("/move", largeFileController.moveFileOrFolder);
+
 
 export default router;
