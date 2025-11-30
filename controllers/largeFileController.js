@@ -267,6 +267,7 @@ export const getFileList = async (req, res) => {
 }
 
 /**
+ * @description 创建文件夹
  * @param {string} name 文件夹名称
  * @param {string | null} parentId 父目录ID，null表示根目录
  */
@@ -476,9 +477,11 @@ export const deleteFileOrFolder = async (req, res) => {
 }
 
 
-// 假设你已经有：
-// const pool = require('./dbPool');
-// 并且 req.user.claims.sub 中包含当前用户 id
+/**
+ * @description 移动文件或文件夹
+ * @param {string} draggedId - 被移动的文件或文件夹的ID
+ * @param {string} newParentId - 新的父目录ID，若移动到根目录则为 'null'
+ */
 export const moveFileOrFolder = async (req, res) => {
     const userId = req.user.claims.sub;
     const { draggedId, newParentId } = req.body;
@@ -503,11 +506,15 @@ export const moveFileOrFolder = async (req, res) => {
         }
         const draggedItem = draggedRows[0];
 
-        // 2) 如果 newParentId 不为空，检查目标目录是否存在且是目录，且属于当前用户
-        if (newParentId !== null && newParentId !== undefined) {
+        // 2) 处理 newParentId，标准化为 null 或实际 ID
+        const normalizedParentId = newParentId === 'null' ? null : newParentId;
+
+        // 3) 如果目标不是根目录，检查目标目录
+        if (normalizedParentId !== null) {
+            // 3.1) 检查目标目录是否存在且属于当前用户
             const [targetRows] = await connection.query(
                 `SELECT id, is_directory, parent_id, user_id FROM files_metadata WHERE id = ?`,
-                [newParentId]
+                [normalizedParentId]
             );
             if (targetRows.length === 0) {
                 await connection.rollback();
@@ -525,17 +532,37 @@ export const moveFileOrFolder = async (req, res) => {
                 return res.status(400).json({ code: 1, message: 'Target is not a directory.' });
             }
 
-            // 3) 不能把自己移动到自己（draggedId === newParentId）
-            if (String(draggedId) === String(newParentId)) {
+            // 3.2) 不能把自己移动到自己
+            if (String(draggedId) === String(normalizedParentId)) {
                 await connection.rollback();
                 return res.status(400).json({ code: 1, message: 'Cannot move item into itself.' });
             }
+
+            // 3.3) 检查循环引用：不能将目录移动到其子目录下
+            if (draggedItem.is_directory) {
+                // 检查目标是否是被移动目录的子目录
+                const [childCheckRows] = await connection.query(
+                    `WITH RECURSIVE cte AS (
+                        SELECT id FROM files_metadata WHERE id = ? AND user_id = ?
+                        UNION ALL
+                        SELECT fm.id FROM files_metadata fm
+                        JOIN cte ON fm.parent_id = cte.id
+                        WHERE fm.user_id = ?
+                    ) SELECT id FROM cte WHERE id = ?`,
+                    [draggedId, userId, userId, normalizedParentId]
+                );
+
+                if (childCheckRows.length > 0) {
+                    await connection.rollback();
+                    return res.status(400).json({ code: 1, message: 'Cannot create circular reference by moving directory into its own subdirectory.' });
+                }
+            }
         }
 
-        // 4) 最后执行更新 parent_id（支持将 parent_id 设为 null，即移动到根）
+        // 4) 执行更新 parent_id（支持移动到根目录）
         await connection.query(
             `UPDATE files_metadata SET parent_id = ? WHERE id = ? AND user_id = ?`,
-            [newParentId || null, draggedId, userId]
+            [normalizedParentId, draggedId, userId]
         );
 
         await connection.commit();
@@ -546,7 +573,7 @@ export const moveFileOrFolder = async (req, res) => {
         if (connection) {
             try { await connection.rollback(); } catch (e) { console.error('Rollback error', e); }
         }
-        return res.status(500).json({ code: 1, message: 'Move failed due to server error.' });
+        return res.status(500).json({ code: 1, message: 'Move failed due to server error.', details: error.message });
     } finally {
         if (connection) connection.release();
     }

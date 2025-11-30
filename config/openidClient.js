@@ -2,7 +2,9 @@ import { Issuer } from "openid-client";
 import dotenv from "dotenv";
 dotenv.config();
 
-const keycloakIssuer = await Issuer.discover(process.env.KEYCLOAK_ISSUER);
+const keycloakIssuer = await Issuer.discover(process.env.KEYCLOAK_ISSUER, {
+    timeout: 10000,
+});
 
 const client = new keycloakIssuer.Client({
     client_id: process.env.KEYCLOAK_CLIENT_ID,

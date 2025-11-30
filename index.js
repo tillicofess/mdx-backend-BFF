@@ -8,6 +8,7 @@ import passport from 'passport';
 import expressSession from 'express-session';
 import articleRoutes from './routes/articleRoutes.js';
 import largeFileRoutes from './routes/largeFile.js';
+import cosRoutes from './routes/cosRoutes.js';
 import pool from './config/db.js';
 
 dotenv.config();
@@ -133,6 +134,7 @@ app.get('/frontchannel-logout', (req, res) => {
 
 app.use('/articles', checkAuthenticated, articleRoutes);
 app.use('/largeFile', checkAuthenticated, largeFileRoutes);
+app.use('/cos', checkAuthenticated, cosRoutes);
 
 // 测试数据库连接函数
 async function testDatabaseConnection() {
