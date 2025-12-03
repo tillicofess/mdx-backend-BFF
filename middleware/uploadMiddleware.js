@@ -2,12 +2,16 @@ import multer from "multer";
 import path from "path";
 import { fileURLToPath } from "url";
 import { v4 as uuidv4 } from 'uuid';
+import fse from 'fs-extra';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // 临时目录（Multer 会先把上传文件放在这里）
 export const TEMP_DIR = path.resolve(__dirname, "../temp");
+
+// 确保临时目录存在
+fse.ensureDirSync(TEMP_DIR);
 
 // 通用 Multer 存储配置
 export const createStorage = (filenameStrategy = null) => {
@@ -19,8 +23,8 @@ export const createStorage = (filenameStrategy = null) => {
             if (filenameStrategy) {
                 return filenameStrategy(req, file, cb);
             }
-            // 默认文件名策略
-            cb(null, file.originalname || `${Date.now()}-${file.fieldname}`);
+            // 默认文件名策略：使用UUID确保唯一性，避免使用originalname导致的子目录问题
+            cb(null, `${Date.now()}-${uuidv4()}-${file.fieldname}`);
         }
     });
 };

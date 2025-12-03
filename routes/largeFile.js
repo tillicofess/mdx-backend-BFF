@@ -13,6 +13,7 @@ router.post("/createFolder", largeFileController.createFolder);
 router.delete("/delete/:id", largeFileController.deleteFileOrFolder);
 router.post("/rename", largeFileController.renameFolderOrFile);
 router.post("/move", largeFileController.moveFileOrFolder);
+router.get("/download/:id", largeFileController.downloadFile);
 
 
 export default router;

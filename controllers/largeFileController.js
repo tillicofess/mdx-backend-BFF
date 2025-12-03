@@ -578,3 +578,87 @@ export const moveFileOrFolder = async (req, res) => {
         if (connection) connection.release();
     }
 };
+
+/**
+ * @description 下载文件
+ * @param {string} id - 文件ID
+ */
+export const downloadFile = async (req, res) => {
+    const userId = req.user?.claims?.sub;
+    const { id } = req.params;
+
+    if (!id) {
+        return res.status(400).json({ status: false, message: "缺少文件ID" });
+    }
+
+    let connection;
+    try {
+        connection = await pool.getConnection();
+
+        // 1. 查询文件元数据，验证权限
+        const [fileRows] = await connection.query(
+            `SELECT id, name, size, storage_path FROM files_metadata 
+             WHERE id = ? AND user_id = ? AND is_directory = FALSE`,
+            [id, userId]
+        );
+
+        if (fileRows.length === 0) {
+            return res.status(404).json({ status: false, message: "文件不存在或无权限访问" });
+        }
+
+        const file = fileRows[0];
+        const filePath = file.storage_path;
+
+        // 2. 检查文件是否存在
+        if (!fse.existsSync(filePath)) {
+            return res.status(404).json({ status: false, message: "文件不存在" });
+        }
+
+        // 3. 获取文件状态信息
+        const fileStat = await fse.stat(filePath);
+        const fileSize = fileStat.size;
+
+        // 4. 处理 Range 请求
+        const range = req.headers.range;
+        if (range) {
+            const parts = range.replace(/bytes=/, "").split("-");
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+            // 确保范围有效
+            const chunkSize = end - start + 1;
+            if (chunkSize <= 0 || start >= fileSize) {
+                return res.status(416).send("Requested range not satisfiable");
+            }
+
+            // 设置响应头
+            res.writeHead(206, {
+                "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+                "Accept-Ranges": "bytes",
+                "Content-Length": chunkSize,
+                "Content-Disposition": `attachment; filename="${encodeURIComponent(file.name)}"`,
+                "Content-Type": "application/octet-stream"
+            });
+
+            // 流式传输文件片段
+            const fileStream = fse.createReadStream(filePath, { start, end });
+            fileStream.pipe(res);
+        } else {
+            // 5. 完整文件下载
+            res.writeHead(200, {
+                "Content-Length": fileSize,
+                "Content-Disposition": `attachment; filename="${encodeURIComponent(file.name)}"`,
+                "Content-Type": "application/octet-stream"
+            });
+
+            // 流式传输完整文件
+            const fileStream = fse.createReadStream(filePath);
+            fileStream.pipe(res);
+        }
+    } catch (error) {
+        console.error('Error downloading file:', error);
+        res.status(500).json({ status: false, message: "文件下载失败" });
+    } finally {
+        if (connection) connection.release();
+    }
+};
